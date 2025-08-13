@@ -1,0 +1,19 @@
+How to use this template
+
+1. identify the app id from winget using 'winget search'
+2. obtain the logo and save in this folder
+3. update the following 3 places to add the winget app name (ID):
+
+1. install.vbs - this file is used in the intune install command box: wscript.exe ".\install.vbs"
+2. uninstall.vbs - this file is used in the intune uninstall command box: wscript.exe ".\uninstall.vbs"
+3. detection.ps1 - this file is used as the intune detection script
+
+run the intunewinapputil against the folder
+specify the install.vbs as the install file
+output will be folder\output
+uploade to intune
+add icon
+update descriptions in intune app settings
+set the detection script to point to the local copy of Detection.ps1
+
+Assign to users / devices
