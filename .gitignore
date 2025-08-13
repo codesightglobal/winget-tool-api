@@ -139,3 +139,7 @@ ecosystem.config.js
 Dockerfile
 docker-compose.yml
 docker-compose.*.yml
+
+
+# Ignore everything inside repos
+repos/*
