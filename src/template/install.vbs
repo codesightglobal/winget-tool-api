@@ -47,7 +47,7 @@ scriptPath = shell.CurrentDirectory & "\Winget.ps1"
 ' Note the correct PowerShell syntax: parameters use a single dash, e.g. -Id
 ' ------------------------------------------------------------------------------
 
-command = powershellPath & " -ExecutionPolicy Bypass -MTA -File """ & scriptPath & """ -Install -Id <Replace me> -Version Latest -Verbose"
+command = powershellPath & " -ExecutionPolicy Bypass -MTA -File """ & scriptPath & """ -Install -Id <Replace me:Id> -Version Latest -Verbose"
 
 ' ------------------------------------------------------------------------------
 ' EXECUTE: Run the PowerShell command silently (no command prompt window)

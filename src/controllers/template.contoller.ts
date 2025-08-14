@@ -1,6 +1,54 @@
+import path from "path";
+import fs from "fs-extra";
 import { Request, Response } from "express";
-import { ApiResponse } from "../models/package.model";
+import { TemplateFilesService } from "../services/template.service";
+import { getSixDigitNoZero } from "../utils/random";
+import { logger } from "../utils/logger";
+
+interface TemplateRequestBody {
+  id: string;
+  organization: string;
+}
 
 export class TemplateController {
-  constructor() {}
+  constructor(private templateService: TemplateFilesService) {}
+
+  async downloadEditedTemplate(req: Request, res: Response) {
+    try {
+      const { id, organization } = req.body as TemplateRequestBody;
+
+      if (!id || !organization) {
+        return res
+          .status(400)
+          .json({ error: "ID and Organization are required" });
+      }
+
+      if (typeof id !== "string" || typeof organization !== "string") {
+        return res.status(400).json({ error: "Invalid data types" });
+      }
+
+      const tempDir = await this.templateService.copyTemplateToTemp();
+
+      const replacements = {
+        "<Replace me:Id>": `${id}`,
+        "<Replace me:Organization>": `${organization}`,
+      };
+
+      await this.templateService.editTemplateFiles(tempDir, replacements);
+
+      const zipPath = path.join(
+        __dirname,
+        `../../tmp/${getSixDigitNoZero()}.zip`
+      );
+      await this.templateService.createZip(tempDir, zipPath);
+
+      res.download(zipPath, "template.zip", async (err) => {
+        await fs.remove(tempDir);
+        await fs.remove(zipPath);
+      });
+    } catch (error) {
+      logger.error("Failed to download", error);
+      res.status(500).json({ error: "Failed to process template" });
+    }
+  }
 }

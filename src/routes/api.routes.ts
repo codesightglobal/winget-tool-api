@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { PackageController } from "../controllers/package.controller";
 import { SyncController } from "../controllers/sync.controller";
+import { TemplateController } from "../controllers/template.contoller";
 
 export function createApiRoutes(
   packageController: PackageController,
-  syncController: SyncController
+  syncController: SyncController,
+  templateController: TemplateController
 ): Router {
   const router = Router();
 
@@ -31,6 +33,12 @@ export function createApiRoutes(
 
   // Trigger manual sync
   router.post("/sync", syncController.triggerSync.bind(syncController));
+
+  // Download edited template
+  router.post(
+    "/template",
+    templateController.downloadEditedTemplate.bind(templateController)
+  );
 
   return router;
 }

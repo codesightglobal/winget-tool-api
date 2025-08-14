@@ -49,7 +49,7 @@ function Get-IntuneTenantName {
 # Get tenant name (or fallback to 'UnknownTenant')
 $intuneTenantName = Get-IntuneTenantName
 if ([string]::IsNullOrWhiteSpace($intuneTenantName)) {
-    $intuneTenantName = "<Replace me>"
+    $intuneTenantName = "<Replace me:Organization>"
 }
 
 # Construct log path based on action

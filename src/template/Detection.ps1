@@ -21,7 +21,7 @@
 # Set $Id to the WinGet package identifier (e.g., 'notepad++.notepad++'). Use winget search <AppName> to get the ID
 # Set $Version to the specific version string or 'Latest' to always check for updates.
 # ---------------------------
-$Id = '<Replace me>'
+$Id = '<Replace me:Id>'
 $Version = 'Latest' # Example: '8.7.8' or 'Latest'
 
 # ---------------------------

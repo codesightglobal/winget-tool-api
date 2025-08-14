@@ -9,6 +9,8 @@ import { PackageController } from "./controllers/package.controller";
 import { SyncController } from "./controllers/sync.controller";
 import { setupScheduledSync } from "./tasks/sync.task";
 import { logger } from "./utils/logger";
+import { TemplateFilesService } from "./services/template.service";
+import { TemplateController } from "./controllers/template.contoller";
 
 async function startServer() {
   const app = express();
@@ -24,8 +26,14 @@ async function startServer() {
   const packageController = new PackageController(packageService);
   const syncController = new SyncController(packageService);
 
+  const templateService = new TemplateFilesService();
+  const templateController = new TemplateController(templateService);
+
   // Setup routes
-  app.use("/api", createApiRoutes(packageController, syncController));
+  app.use(
+    "/api",
+    createApiRoutes(packageController, syncController, templateController)
+  );
 
   // Root endpoint
   app.get("/", (req, res) => {
