@@ -1,164 +1,221 @@
-# ------------------------------------------------------------------------------
-# Detection script to check if a WinGet package is installed and whether it needs
-# to be updated or repaired using PowerShell v7.
-# 
-# This script addresses the issue that WinGet cmdlets do not work properly when
-# run under SYSTEM context in PowerShell v5 (see https://github.com/microsoft/winget-cli/issues/4820).
-#
-# The script:
-# - Uses PowerShell 7 explicitly to run WinGet commands.
-# - Checks if the required PowerShell 7 executable is present.
-# - Attempts to import or install/update the Microsoft.WinGet.Client module.
-# - Repairs the WinGet Package Manager if necessary.
-# - Retrieves the currently installed package info by ID.
-# - Compares installed version with desired version or checks for updates.
-# - Outputs status messages with timestamps.
-# - Uses transcript logging for detailed record of execution.
-# ------------------------------------------------------------------------------
+﻿<#
+.SYNOPSIS
+    Detection script for WinGet packages to be used with Microsoft Intune
 
-# ---------------------------
-# Define the WinGet package ID and version to check
-# Set $Id to the WinGet package identifier (e.g., 'notepad++.notepad++'). Use winget search <AppName> to get the ID
-# Set $Version to the specific version string or 'Latest' to always check for updates.
-# ---------------------------
-$Id = '<Replace me:Id>'
-$Version = 'Latest' # Example: '8.7.8' or 'Latest'
+.DESCRIPTION
+    This script detects if a specified WinGet package is installed and at the correct version.
+    It uses PowerShell v7 to interact with WinGet as the cmdlets don't work in SYSTEM context with PowerShell v5.
+    The script will exit with code 1 if the package needs to be installed/updated, or 0 if no action is needed.
 
-# ---------------------------
-# Function: Get-IntuneTenantName
-# Attempts to retrieve the Intune tenant name for the current user by querying
-# the registry path where enrollment information is stored.
-# Returns the tenant name or $null if not found or on error.
-# ---------------------------
+.EXAMPLE
+    .\testdet.ps1
+
+.NOTES
+    Author: Damien Cresswell, Sistena LTD.
+    Last Edit: <Today's date>
+#>
+
+#Running Get-WinGetPackage and Repair-WinGetPackageManager in PowerShell v7 because the WinGet cmdlets don't work in SYSTEM context in PowerShell v5
+#See https://github.com/microsoft/winget-cli/issues/4820
+#Supply the ID and version of the WinGet package here, use Latest if version is not important
+#For example $Id = 'notepad++.notepad++' / $Version = '8.7.8' or $Id = '7zip.7zip' / $Version = 'Latest'
+$Id = '<replace with package ID>'
+$Version = '<replace with version> or Latest'
+
+<#--------------------------------------------------#>
+ # Function to fetch intune enrolled tenant name
+<#--------------------------------------------------#>
+
 function Get-IntuneTenantName {
     try {
-        $enrollmentsPath = "HKLM:\\SOFTWARE\\Microsoft\\Enrollments"
+        $enrollmentsPath = "HKLM:\SOFTWARE\Microsoft\Enrollments"
         $enrollmentKeys = Get-ChildItem -Path $enrollmentsPath -ErrorAction SilentlyContinue
-
         foreach ($key in $enrollmentKeys) {
-            # Try to read the UPN property which contains the user principal name (email)
             $upn = (Get-ItemProperty -Path $key.PSPath -Name "UPN" -ErrorAction SilentlyContinue).UPN
-
             if ($upn) {
-                # Extract the domain part of the UPN which corresponds to the tenant name
-                $tenantName = $upn -replace '.*@', ''
-                return $tenantName
+                return ($upn -replace '.*@', '')
             }
         }
-
-        # Tenant name not found in registry
-        Write-Output "Could not find Intune tenant name in registry"
+        Write-Verbose "Could not find Intune tenant name in registry"
         return $null
-    }
-    catch {
-        # Log error and return null
-        Write-Output "Error getting Intune tenant name: $_"
+    } catch {
+        Write-Verbose "Error getting Intune tenant name: $($_ | Out-String)"
         return $null
     }
 }
 
-# ---------------------------
-# Retrieve and store the Intune tenant name for use in log paths
-# ---------------------------
+# Get tenant name (or fallback to 'UnknownTenant')
 $intuneTenantName = Get-IntuneTenantName
 if ([string]::IsNullOrWhiteSpace($intuneTenantName)) {
-    $intuneTenantName = "<replace.Me>"
+    $intuneTenantName = "<replace with tenant name>"
 }
 
-# ---------------------------
-# Start transcript logging to capture detailed output and errors
-# Log file path includes tenant name, computer name, and Id for uniqueness.
-# Transcript overwrites the log file each time instead of appending.
-# ---------------------------
-$logPath = "C:\ProgramData\$intuneTenantName\$env:COMPUTERNAME"
-if (-not (Test-Path -Path $logPath)) {
-    New-Item -ItemType Directory -Path $logPath -Force | Out-Null
-}
-$transcriptFile = Join-Path -Path $logPath -ChildPath "$($Id)detection.txt"
+# Define product name for log path
+$productName = $Id -replace '\.', '_'
 
-# Remove existing log file if it exists to avoid appending
-if (Test-Path -Path $transcriptFile) {
-    Remove-Item -Path $transcriptFile -Force
-}
+# Construct log path based on action
+$logPath = "C:\ProgramData\$intuneTenantName\$env:COMPUTERNAME\$($productName)_Detection.txt"
 
-Start-Transcript -Path $transcriptFile -Force
+Start-Transcript -Path $logPath -Append -Force
 
-# ---------------------------
-# Verify that PowerShell 7 (pwsh.exe) exists in the expected location
-# If missing, log error and exit with code 1 to indicate failure
-# ---------------------------
+#Check if PowerShell v7 is installed before continuing the Detection
 if (-not (Test-Path -LiteralPath 'C:\Program Files\PowerShell\7\pwsh.exe')) {
     Write-Host ("{0} - PowerShell v7 was not found at 'C:\Program Files\PowerShell\7\pwsh.exe', exiting..." -f $(Get-Date -Format "dd-MM-yy HH:mm"))
     Stop-Transcript
     exit 1
 }
 
-# ---------------------------
-# Pre-WinGet detection: Try to get Name from WinGet, else fallback to Id
-# ---------------------------
-$Name = $null
-$software = & 'C:\Program Files\PowerShell\7\pwsh.exe' -MTA -Command {
-    try {
-        if (Get-Module Microsoft.WinGet.Client -ListAvailable) {
-            $latestAvailable = (Find-Module Microsoft.WinGet.Client).Version
-            $installedVersion = (Get-Module Microsoft.WinGet.Client -ListAvailable | Sort-Object Version -Descending | Select-Object -First 1).Version
-            if ($installedVersion -lt $latestAvailable) {
-                Update-Module Microsoft.WinGet.Client -Force:$true -Confirm:$false -Scope AllUsers
-            }
+#Check if software is installed
+Write-Host "Starting PowerShell v7 subprocess to check WinGet package..."
+Write-Host "Checking for package ID: $Id"
+
+# Create a temporary script file for PowerShell v7
+$tempScript = @"
+#Import the Microsoft.WinGet.Client module, install it if it's not found or update if outdated
+try {
+    if (Get-Module Microsoft.WinGet.Client -ListAvailable) {
+        if ((Get-Module Microsoft.WinGet.Client -ListAvailable | Sort-Object Version -Descending | Select-Object -First 1).Version -lt (Find-Module Microsoft.WinGet.Client).Version) {
+            Update-Module Microsoft.WinGet.Client -Force:`$true -Confirm:`$false -Scope AllUsers
         }
-        Import-Module Microsoft.WinGet.Client -ErrorAction Stop
-    } catch {
-        Install-Module Microsoft.WinGet.Client -Force:$true -Confirm:$false -Scope AllUsers
-        Import-Module Microsoft.WinGet.Client
     }
-    try {
-        Assert-WinGetPackageManager -ErrorAction Stop
-    } catch {
-        Repair-WinGetPackageManager -AllUsers -Force:$true -Latest:$true
-    }
-    Get-WinGetPackage -Source WinGet
-} | Where-Object Id -EQ $Id
-
-if ($null -ne $software) {
-    $Name = $software.Name
-} else {
-    $Name = $Id
+    Import-Module Microsoft.WinGet.Client -ErrorAction Stop
+    Write-Host `"Module loaded successfully`"
 }
-# ---------------------------
-# Compare the installed package version with the desired version
-# Two scenarios:
-# - Specific version requested (not 'Latest')
-# - Latest version requested
-# Depending on comparison, exit with code 0 (no action needed) or 1 (install/update needed)
-# ---------------------------
+catch {
+    Install-Module Microsoft.WinGet.Client -Force:`$true -Confirm:`$false -Scope AllUsers
+    Import-Module Microsoft.WinGet.Client
+    Write-Host `"Module installed and loaded`"
+}
 
+#Repair/Install WinGetPackagemanager if not found
+try {
+    Assert-WinGetPackageManager -ErrorAction Stop
+    Write-Host `"WinGet package manager is working`"
+}
+catch {
+    Repair-WinGetPackageManager -AllUsers -Force:`$true -Latest:`$true
+    Write-Host `"WinGet package manager repaired`"
+}
+
+#Get the WinGetPackage details and return only the object
+Write-Host `"Searching for package: '$Id'`"
+`$allPackages = Get-WinGetPackage -Source WinGet -ErrorAction SilentlyContinue
+Write-Host `"Total packages found: `$(`$allPackages.Count)`"
+
+`$package = Get-WinGetPackage -Id '$Id' -Source WinGet -ErrorAction SilentlyContinue | Select-Object -First 1
+Write-Host `"Package found: `$(`$package -ne `$null)`"
+
+if (`$package) {
+    Write-Host `"Package details: `$(`$package.Name) - Version: `$(`$package.InstalledVersion) - Update Available: `$(`$package.IsUpdateAvailable)`"
+    # Return the object as JSON to preserve the object structure
+    `$result = [PSCustomObject]@{
+        InstalledVersion = `$package.InstalledVersion
+        IsUpdateAvailable = `$package.IsUpdateAvailable
+        AvailableVersions = `$package.AvailableVersions 
+    }
+    # Convert to JSON and return as string to preserve object structure
+    ConvertTo-Json -InputObject `$result -Compress
+} else {
+    Write-Host `"No package found with ID: '$Id'`"
+    `$null
+}
+"@
+
+$tempScriptPath = [System.IO.Path]::GetTempFileName() + ".ps1"
+$tempScript | Out-File -FilePath $tempScriptPath -Encoding UTF8
+
+try {
+    $output = & 'C:\Program Files\PowerShell\7\pwsh.exe' -MTA -File $tempScriptPath
+    Write-Host "Raw output from PowerShell v7:"
+    $output | ForEach-Object { Write-Host "  $_" }
+    
+    # Find the JSON string in the output and deserialize it back to an object
+    $jsonString = $output | Where-Object { $_ -ne $null -and $_ -ne "" -and $_.StartsWith('{') -and $_.EndsWith('}') } | Select-Object -First 1
+    
+    if ($jsonString) {
+        try {
+            $software = $jsonString | ConvertFrom-Json
+            Write-Host "Successfully deserialized JSON to object"
+        } catch {
+            Write-Host "Failed to deserialize JSON: $_"
+            $software = $null
+        }
+    } else {
+        Write-Host "No JSON string found in output"
+        $software = $null
+    }
+} finally {
+    # Clean up temp file
+    if (Test-Path $tempScriptPath) {
+        Remove-Item $tempScriptPath -Force
+    }
+}
+
+Write-Host "PowerShell v7 subprocess completed."
+if ($software) {
+    Write-Host "Software object type: $($software.GetType().FullName)"
+    Write-Host "Software object value: $software"
+    if ($software.GetType().Name -eq 'PSCustomObject') {
+        Write-Host "Software object properties: $($software | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name)"
+        Write-Host "InstalledVersion: $($software.InstalledVersion)"
+        Write-Host "IsUpdateAvailable: $($software.IsUpdateAvailable)"
+    }
+} else {
+    Write-Host "Software object is null - package not found"
+}
+
+# Locate winget.exe path
+$wingetPath = Get-ChildItem -Path "$Env:ProgramFiles\WindowsApps" -Directory |
+    Where-Object { $_.Name -like "Microsoft.DesktopAppInstaller_*" } |
+    ForEach-Object { Join-Path $_.FullName "winget.exe" } |
+    Where-Object { Test-Path $_ } |
+    Select-Object -First 1
+
+Write-Host "wingetPath resolved to: $wingetPath"
+
+if (-not $wingetPath) {
+    Write-Error "winget.exe not found."
+    Write-Host "Please install the Microsoft Desktop App Installer from the Microsoft Store."
+    Stop-Transcript
+    exit 1
+}
+
+#If $Id was not found, stop and exit, and let Intune install it, or do nothing if it was uninstalled
+Write-Host "Checking if software object is null..."
+if ($software) {
+    Write-Host "Software object type: $($software.GetType().FullName)"
+    Write-Host "Software object properties: $($software | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name)"
+} else {
+    Write-Host "Software object is null - package not found"
+}
+
+if ($null -eq $software) {
+    Write-Host ("{0} - {1} was not found on this system, installing now or doing nothing if it was uninstalled..." -f $(Get-Date -Format "dd-MM-yy HH:mm"), $Id)
+    Stop-Transcript
+    exit 1
+}
+
+# Check version and exit accordingly if the version is not the same as the installed version or when there's an update available, install it or do nothing if it was uninstalled
 if ($Version -ne 'Latest') {
-    # Convert versions to [version] type for accurate comparison
-    if ([version]$Version -le [version]$software.InstalledVersion) {
-        # Installed version is same or newer than requested - no update needed
-        Write-Host ("{0} - Installed version {1} of {2} is higher or equal than specified version {3}, nothing to do..." -f $(Get-Date -Format "dd-MM-yy HH:mm"), [version]$software.InstalledVersion, $Id, [version]$Version)
-        Stop-Transcript
-        exit 0
-    }
-    if ([version]$Version -gt [version]$software.InstalledVersion) {
-        # Installed version is older than requested - update required
-        Write-Host ("{0} - {1} version is {2}, which is lower than specified {3} version, updating now..." -f $(Get-Date -Format "dd-MM-yy HH:mm"), $Id, $software.InstalledVersion, $Version)
-        Stop-Transcript
-        exit 1
-    }
+    # If a specific version is specified and package is installed, exit 0 (no action needed)
+    Write-Host ("{0} - {1} is installed with version {2}. Specific version {3} was requested, no action needed..." -f $(Get-Date -Format "dd-MM-yy HH:mm"), $Id, $software.InstalledVersion, $Version)
+    Stop-Transcript
+    exit 0
 }
 
 if ($Version -eq 'Latest') {
     if ($software.IsUpdateAvailable -eq $false) {
-        # Latest version is already installed - no update needed
+        Write-Host $software.InstalledVersion
         Write-Host ("{0} - {1} version is current (Version {2}), nothing to do..." -f $(Get-Date -Format "dd-MM-yy HH:mm"), $Id, $software.InstalledVersion)
         Stop-Transcript
         exit 0
     }
     else {
-        # Update available - install the update
-        Write-Host ("{0} - {1} was found with version {2}, but there's an update available for it ({3}), updating now..." -f $(Get-Date -Format "dd-MM-yy HH:mm"), $Id, $software.InstalledVersion, $($software.AvailableVersions | Select-Object -First 1))
+        Write-Host ("{0} - {1} was found with version {2}, but there's an update available for it, updating now..." -f $(Get-Date -Format "dd-MM-yy HH:mm"), $Id, $software.InstalledVersion)
+        Write-Host "Update initiated to version $Version."
+        Start-Process $wingetPath -ArgumentList "upgrade --id $Id --silent --accept-source-agreements --accept-package-agreements" -Wait -verbose
+        Write-Host "Update completed."
         Stop-Transcript
-        exit 1
+        exit 0
     }
 }
