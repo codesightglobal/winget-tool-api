@@ -8,6 +8,7 @@ import { logger } from "../utils/logger";
 interface TemplateRequestBody {
   id: string;
   organization: string;
+  version?: string;
 }
 
 export class TemplateController {
@@ -15,7 +16,7 @@ export class TemplateController {
 
   async downloadEditedTemplate(req: Request, res: Response) {
     try {
-      const { id, organization } = req.body as TemplateRequestBody;
+      const { id, organization, version } = req.body as TemplateRequestBody;
 
       if (!id || !organization) {
         return res
@@ -27,11 +28,16 @@ export class TemplateController {
         return res.status(400).json({ error: "Invalid data types" });
       }
 
+      if (version && typeof version !== "string") {
+        return res.status(400).json({ error: "Invalid version" });
+      }
+
       const tempDir = await this.templateService.copyTemplateToTemp();
 
       const replacements = {
         "<Replace me:Id>": `${id}`,
         "<Replace me:Organization>": `${organization}`,
+        "<Replace me:Version>": version ? version : "Latest",
       };
 
       await this.templateService.editTemplateFiles(tempDir, replacements);
