@@ -52,7 +52,7 @@ async function startServer() {
 
   // Error handling
   app.use((err: any, req: any, res: any, next: any) => {
-    logger.error("Unhandled error:", err);
+    console.log("Unhandled error:", err);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -75,17 +75,17 @@ async function startServer() {
 
     // Graceful shutdown
     process.on("SIGTERM", () => {
-      logger.info("SIGTERM received, shutting down gracefully");
+      console.log("SIGTERM received, shutting down gracefully");
       server.close(() => {
-        logger.info("Server closed");
+        console.log("Server closed");
         process.exit(0);
       });
     });
 
     process.on("SIGINT", () => {
-      logger.info("SIGINT received, shutting down gracefully");
+      console.log("SIGINT received, shutting down gracefully");
       server.close(() => {
-        logger.info("Server closed");
+        console.log("Server closed");
         process.exit(0);
       });
     });
