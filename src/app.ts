@@ -61,7 +61,7 @@ async function startServer() {
   });
 
   try {
-    logger.info("Initializing application...");
+    console.log("Initializing application...");
     await packageService.initialize();
 
     // Setup scheduled sync
@@ -69,8 +69,8 @@ async function startServer() {
 
     // Start server
     const server = app.listen(serverConfig.port, () => {
-      logger.info(`Server running on port ${serverConfig.port}`);
-      logger.info(`Repository: ${defaultConfig.url}`);
+      console.log(`Server running on port ${serverConfig.port}`);
+      console.log(`Repository: ${defaultConfig.url}`);
     });
 
     // Graceful shutdown
@@ -90,7 +90,7 @@ async function startServer() {
       });
     });
   } catch (error) {
-    logger.error("Failed to start server:", error);
+    console.log("Failed to start server:", error);
     process.exit(1);
   }
 }
