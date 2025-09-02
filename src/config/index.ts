@@ -1,5 +1,10 @@
 import { RepoConfig } from "../models/repo-config.model";
 
+import dotenv from "dotenv";
+
+// Load .env variables
+dotenv.config();
+
 export const defaultConfig: RepoConfig = {
   url: process.env.REPO_URL || "https://github.com/microsoft/winget-pkgs.git",
   localPath: process.env.LOCAL_PATH || "./repos/winget-pkgs",
