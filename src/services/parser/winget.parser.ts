@@ -19,7 +19,7 @@ export class WingetParser extends BaseParser {
       const packageIdentifier = manifest.PackageIdentifier;
       const packageName =
         manifest.PackageName || manifest.DefaultLocale?.PackageName;
-      const packageVersion = manifest.packageVersion;
+      const packageVersion = manifest.PackageVersion;
       const publisher = manifest.Publisher || manifest.DefaultLocale?.Publisher;
 
       if (!packageIdentifier) {
