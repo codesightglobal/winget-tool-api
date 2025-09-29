@@ -15,7 +15,7 @@ export const defaultConfig: RepoConfig = {
 
 export const serverConfig = {
   port: parseInt(process.env.PORT || "3000"),
-  corsOrigins: process.env.CORS_ORIGINS?.split(",") || ["*"],
+  corsOrigins: process.env.CORS_ORIGINS?.split(",") || [],
   maxSearchResults: 100,
   defaultSearchLimit: 20,
 };

@@ -1,23 +1,15 @@
-' :: Script for use by Damien.Cresswell@sistena.co.uk
 ' ------------------------------------------------------------------------------
-' Silent VBS launcher for PowerShell scripts (no console window shown).
-' This template can be reused to install any application silently using a 
-' PowerShell script and Winget or other methods.
-' ------------------------------------------------------------------------------
+' .SYNOPSIS
+'     Silent VBS launcher for PowerShell scripts (no console window shown)
 '
-' This script launches a PowerShell 7 script silently (no visible window),
-' passing parameters for installation or uninstallation, and waits for completion.
+' .DESCRIPTION
+'     This script launches a PowerShell 7 script silently (no visible window),
+'     passing parameters for installation or uninstallation, and waits for completion.
+'     It assumes PowerShell 7 is installed and the script resides in the same folder.
 '
-' It assumes:
-' - PowerShell 7 is installed in the specified path
-' - The PowerShell script resides in the same folder as this VBS file
-' - Parameters such as App Id and Version can be modified per app requirements
-'
-' Usage:
-' - Modify the PowerShell path if necessary
-' - Modify the script path if your script location differs
-' - Adjust the command-line arguments as needed for your app's installation
-'
+' .NOTES
+'     Author: Damien Cresswell, Sistena LTD.
+'     Last Edit: 2024-07-08
 ' ------------------------------------------------------------------------------
 
 Dim shell, powershellPath, scriptPath, command
@@ -47,7 +39,7 @@ scriptPath = shell.CurrentDirectory & "\Winget.ps1"
 ' Note the correct PowerShell syntax: parameters use a single dash, e.g. -Id
 ' ------------------------------------------------------------------------------
 
-command = powershellPath & " -ExecutionPolicy Bypass -MTA -File """ & scriptPath & """ -Install -Id <Replace me:Id> -Version Latest -Verbose"
+command = powershellPath & " -ExecutionPolicy Bypass -MTA -File """ & scriptPath & """ -Install -Id <replace me> -Version Latest -Verbose"
 
 ' ------------------------------------------------------------------------------
 ' EXECUTE: Run the PowerShell command silently (no command prompt window)
