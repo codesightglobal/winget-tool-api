@@ -75,7 +75,7 @@ function Get-IntuneTenantName {
 # Get tenant name (or fallback to 'UnknownTenant')
 $intuneTenantName = Get-IntuneTenantName
 if ([string]::IsNullOrWhiteSpace($intuneTenantName)) {
-    $intuneTenantName = "<tenant domain>" # <> This will be captured during the form and then changed to the captured information
+    $intuneTenantName = "<Replace me:Organization>" # <> This will be captured during the form and then changed to the captured information
 }
 
 # Construct log path based on action

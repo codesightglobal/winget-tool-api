@@ -21,8 +21,8 @@
 # Set $Id to the WinGet package identifier (e.g., 'notepad++.notepad++'). Use winget search <AppName> to get the ID
 # Set $Version to the specific version string or 'Latest' to always check for updates.
 # ---------------------------
-$Id = '<replace me>' #this is replaced by the form with the winget ID from the app they choose on the form.
-$Version = 'Latest' # Example: '8.7.8' or 'Latest'
+$Id = '<Replace me:Id>' #this is replaced by the form with the winget ID from the app they choose on the form.
+$Version = '<Replace me:Version>' # Example: '8.7.8' or 'Latest'
 
 # ---------------------------
 # Function: Get-IntuneTenantName
