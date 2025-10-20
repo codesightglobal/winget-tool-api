@@ -1,4 +1,4 @@
-# ------------------------------------------------------------------------------
+﻿# ------------------------------------------------------------------------------
 # Detection script to check if a WinGet package is installed and whether it needs
 # to be updated or repaired using PowerShell v7.
 # 
@@ -62,7 +62,7 @@ function Get-IntuneTenantName {
 # ---------------------------
 $intuneTenantName = Get-IntuneTenantName
 if ([string]::IsNullOrWhiteSpace($intuneTenantName)) {
-    $intuneTenantName = "<replace.Me>" # This is replaced by the domain prompt on the form
+    $intuneTenantName = "<Replace me:Organization>" # This is replaced by the domain prompt on the form
 }
 
 # ---------------------------
