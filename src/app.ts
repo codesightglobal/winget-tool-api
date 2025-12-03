@@ -18,12 +18,7 @@ async function startServer() {
   // Middleware
   app.use(helmet());
   app.use(compression());
-  app.use(
-    cors({
-      origin: serverConfig.corsOrigins, // array from env
-      credentials: true, // if you need cookies
-    })
-  );
+  app.use(cors());
   app.use(express.json());
 
   // Initialize services
