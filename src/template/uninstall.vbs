@@ -1,4 +1,3 @@
-' :: Script Provided by Sistena Ltd, Damien Cresswell
 ' ------------------------------------------------------------------------------
 ' Silent VBS launcher for PowerShell scripts (no console window shown).
 ' ------------------------------------------------------------------------------
@@ -15,7 +14,9 @@
 ' - Modify the PowerShell path if necessary
 ' - Modify the script path if your script location differs
 ' - Adjust the command-line arguments as needed for your app's installation
-'
+' .NOTES
+'     Author: Damien Cresswell, Sistena LTD.
+'     Last Edit: 08-10-2025
 ' ------------------------------------------------------------------------------
 
 Dim shell, powershellPath, scriptPath, command
@@ -45,7 +46,7 @@ scriptPath = shell.CurrentDirectory & "\Winget.ps1"
 ' Note the correct PowerShell syntax: parameters use a single dash, e.g. -Id
 ' ------------------------------------------------------------------------------
 
-command = powershellPath & " -ExecutionPolicy Bypass -MTA -File """ & scriptPath & """ -Uninstall -Id <Replace me:Id> -Verbose"
+command = powershellPath & " -ExecutionPolicy Bypass -MTA -File """ & scriptPath & """ -Uninstall -Id <Replace me: Id> -Verbose"
 
 ' ------------------------------------------------------------------------------
 ' EXECUTE: Run the PowerShell command silently (no command prompt window)

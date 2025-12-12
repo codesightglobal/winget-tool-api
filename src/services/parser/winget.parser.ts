@@ -30,6 +30,7 @@ export class WingetParser extends BaseParser {
         id: packageIdentifier,
         name: packageName || packageIdentifier,
         version: packageVersion,
+        versions: packageVersion ? [packageVersion] : [],
         publisher,
         lastUpdated: new Date(),
       };

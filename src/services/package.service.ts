@@ -92,21 +92,42 @@ export class PackageService {
 
     for (let i = 0; i < files.length; i += batchSize) {
       const batch = files.slice(i, i + batchSize);
-      await Promise.all(
+      const results = await Promise.all(
         batch.map(async (file) => {
           try {
             const fullPath = path.join(this.config.localPath, file);
             const content = await fs.readFile(fullPath, "utf-8");
-            const packageInfo = this.parser.parseManifest(file, content);
-
-            if (packageInfo) {
-              this.packages.set(packageInfo.id, packageInfo);
-            }
+            return this.parser.parseManifest(file, content);
           } catch (error) {
             logger.warn(`Failed to process file ${file}:`, error);
+            return null;
           }
         })
       );
+
+      for (const packageInfo of results) {
+        if (packageInfo) {
+          const existing = this.packages.get(packageInfo.id);
+          if (existing) {
+            const allVersions = new Set([
+              ...(existing.versions || []),
+              ...(packageInfo.versions || []),
+            ]);
+            existing.versions = Array.from(allVersions);
+            // Optionally update other fields if this version is newer
+            // For now, simpler to just ensure versions are collected
+            // If we want the "latest" parsed file to dictate metadata, we swap:
+            // packageInfo.versions = Array.from(allVersions);
+            // this.packages.set(packageInfo.id, packageInfo);
+            // But simply updating versions on existing is safer to keep stability if order is random.
+            // However, keeping the "latest" version number is desirable.
+            // Without semver comparison, hard to know which is newer.
+            // Let's stick to accumulating versions on the object we keep.
+          } else {
+            this.packages.set(packageInfo.id, packageInfo);
+          }
+        }
+      }
 
       processed += batch.length;
       logger.info(`Processed ${processed}/${files.length} files...`);

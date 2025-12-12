@@ -9,8 +9,8 @@
 '
 ' .NOTES
 '     Author: Damien Cresswell, Sistena LTD.
-'     Last Edit: 2024-07-08
-' ------------------------------------------------------------------------------
+'     Last Edit: 08-10-2025
+------------------------------------------------------------------------------
 
 Dim shell, powershellPath, scriptPath, command
 
@@ -39,7 +39,7 @@ scriptPath = shell.CurrentDirectory & "\Winget.ps1"
 ' Note the correct PowerShell syntax: parameters use a single dash, e.g. -Id
 ' ------------------------------------------------------------------------------
 
-command = powershellPath & " -ExecutionPolicy Bypass -MTA -File """ & scriptPath & """ -Install -Id <Replace me:Id> -Version Latest -Verbose"
+command = powershellPath & " -ExecutionPolicy Bypass -MTA -File """ & scriptPath & """ -Install -Id <Replace me: Id> -Version <Replace me: Version> -Verbose"
 
 ' ------------------------------------------------------------------------------
 ' EXECUTE: Run the PowerShell command silently (no command prompt window)

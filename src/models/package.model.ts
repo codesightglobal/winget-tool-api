@@ -2,6 +2,7 @@ export interface PackageInfo {
   id: string;
   name: string;
   version?: string;
+  versions?: string[];
   publisher?: string;
   lastUpdated?: Date;
 }

@@ -1,0 +1,55 @@
+1. Identify the App ID from Winget
+Open PowerShell 7 and run the following command to search for the desired application:
+    winget search "<AppName>"
+Locate the correct application in the list and note its Id (e.g. Microsoft.Edge or 7zip.7zip).
+
+2. Obtain the Logo
+Search for a high-resolution official logo of the application (preferably a .png or .jpg file).
+Save the logo in the root of the template folder, ideally naming it icon.png or icon.jpg.
+
+3. Update Winget App Name in the Following Files
+Update the Winget app ID (identified in step 1) in all three of the following files:
+a. install.vbs
+This script launches the PowerShell 7 installer using wscript.exe.
+Edit the install.ps1 reference or embedded content to include the correct Winget app ID.
+This script is used in Intune as the install command:
+    wscript.exe ".\install.vbs"
+
+b. uninstall.vbs
+Similar to the install script, this file triggers a Winget uninstall command via a PowerShell 7 script.
+Update the referenced Winget ID to match the app's uninstall identifier.
+Used in Intune as the uninstall command:
+    wscript.exe ".\uninstall.vbs"
+
+c. detection.ps1
+This PowerShell 7 script is used to detect whether the app is already installed.
+Update any logic (e.g. Get-AppxPackage, registry paths, or winget list) to detect the correct Winget app ID.
+
+4. Package the App with IntuneWinAppUtil
+Use the Microsoft Win32 Content Prep Tool (IntuneWinAppUtil.exe) to package the folder:
+- Source folder: The folder containing your scripts and icon
+- Setup file: Select install.vbs
+- Output folder: Choose a location for the .intunewin output (e.g. .\output)
+Example CLI usage:
+    IntuneWinAppUtil.exe -c "C:\YourFolder" -s "install.vbs" -o "C:\YourFolder\output"
+
+5. Upload to Intune
+Sign into the Microsoft Intune admin center.
+Navigate to Apps > Windows > Add > App type: Windows app (Win32).
+Upload the .intunewin package from the output folder.
+
+6. Configure the Intune App Settings
+- Add the icon: Upload the icon.png or .jpg you saved earlier.
+- App name & description: Provide a clear, user-friendly name and description of the application.
+- Publisher: Use the name from the Winget package or the official vendor.
+- Command-line arguments: Ensure these are correctly populated as:
+    Install command: wscript.exe ".\install.vbs"
+    Uninstall command: wscript.exe ".\uninstall.vbs"
+- Detection rules:
+    - Choose "Use a custom detection script".
+    - Upload the Detection.ps1 file.
+    - Ensure it is set to run as system and 64-bit.
+
+7. Assign the App
+Under Assignments, add the user or device groups that should receive the application.
+Configure availability (Required / Available for enrolled devices) as needed.

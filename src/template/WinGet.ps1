@@ -1,22 +1,19 @@
 <#
 .SYNOPSIS
-    Install or uninstall a WinGet package with robust logging and optional extras.
+[INSTRUCTION: Briefly describe what this script will do for the specific application, e.g., "Installs or uninstalls <AppName> using WinGet, with detailed logging for Intune deployments."]
 
 .DESCRIPTION
-    Intune-friendly script to manage an application via WinGet. It:
-    - Accepts a package `Id` and `Version` (supports "Latest").
-    - Runs in either install or uninstall mode.
-    - Writes a transcript to C:\ProgramData\<tenant>\<device>\<id>_(install|uninstall).txt.
-    - Attempts to detect the Intune tenant from the registry, with fallback.
-    - Optionally executes a sibling Custom.ps1 for app-specific steps when present.
-    - Optionally uploads the log file to Azure Blob Storage using AzCopy when configured.
-
-.EXAMPLE
-    .\WinGet.ps1 -Id "Vendor.App" -Version "Latest" -Install -Verbose
+[INSTRUCTION: Provide a detailed description of the script's purpose and behavior. Include details such as:
+- The app this script is for (replace <AppName> with the actual app name).
+- How it determines the Intune tenant name and constructs log file paths.
+- That it supports both installation and uninstallation actions.
+- That it can invoke a Custom.ps1 script for additional logic if present.
+- Any other app-specific logic or requirements.]
 
 .NOTES
-    Author: Damien Cresswell, Sistena LTD.
-    Last Edit: 23-09-2025
+Author: [Your Name or Team]
+Last edit: [Date]
+[INSTRUCTION: Update author and date as appropriate for each new app/script.]
 #>
 
 [CmdletBinding(DefaultParameterSetName = 'None', SupportsShouldProcess = $true)]
@@ -31,6 +28,15 @@ param (
 $ErrorActionPreference = 'Stop'
 $env:WINGET_DIAGNOSTICS = "1"
 
+<# uncomment if you want to use AzCopy to upload the log file
+$azCopyUrl = "https://aka.ms/downloadazcopy-v10-windows"
+$azCopyExtractPath = "$env:TEMP\azcopy"
+$azCopyExe = Join-Path $azCopyExtractPath "azcopy_windows_amd64_10.28.1\azcopy.exe"
+# Use URL-encoded container name to ensure proper parsing by AzCopy
+$blobBaseUrl = '<replace with blob base url>'
+$sasToken = "<replace with sas token>" #>
+
+# Enhanced logging function
 function Write-Log {
     param([string]$Message, [string]$Level = "INFO")
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -38,21 +44,6 @@ function Write-Log {
     Write-Host $logMessage
     # Don't try to write to log file during transcript - it's already being captured
 }
-
-$deviceName = $env:COMPUTERNAME
-
-# start of section to be removed if they select to not use azure blob storage for their logs
-$azCopyUrl = "https://aka.ms/downloadazcopy-v10-windows"
-$azCopyExtractPath = "$env:TEMP\azcopy"
-$azCopyExe = Join-Path $azCopyExtractPath "azcopy_windows_amd64_10.28.1\azcopy.exe"
-
-<# If you would like to use azure blob storage for your logs, then this section needs to be uncommented and the variables populated
-
-# Use URL-encoded container name to ensure proper parsing by AzCopy.
-$blobBaseUrl = '<blob base url>' # <> This will be captured during the form and then changed to the captured information if they select to use azure blob storage for their logs   
-$sasToken = "<sas token>" # <> This will be captured during the form and then changed to the captured information if they select to use azure blob storage for their logs
-
-#>
 
 function Get-IntuneTenantName {
     try {
@@ -72,75 +63,54 @@ function Get-IntuneTenantName {
     }
 }
 
-# Get tenant name (or fallback to 'UnknownTenant')
+# Get tenant name (or fallback to '<Replace me:Organization>')
 $intuneTenantName = Get-IntuneTenantName
 if ([string]::IsNullOrWhiteSpace($intuneTenantName)) {
-    $intuneTenantName = "<Replace me:Organization>" # <> This will be captured during the form and then changed to the captured information
+    $intuneTenantName = "<Replace me:Organization>"
 }
 
 # Construct log path based on action
 if ($Install) {
     $logPath = "C:\ProgramData\$intuneTenantName\$env:COMPUTERNAME\$($Id)_install.txt"
-    $blobOption = "_install"
+    #$blobOption = "_install" uncomment if you want to use AzCopy to upload the log file
 } elseif ($Uninstall) {
     $logPath = "C:\ProgramData\$intuneTenantName\$env:COMPUTERNAME\$($Id)_uninstall.txt"
-    $blobOption = "_uninstall"
+    #$blobOption = "_uninstall" uncomment if you want to use AzCopy to upload the log file
 } else {
     $logPath = "C:\ProgramData\$intuneTenantName\$env:COMPUTERNAME\$($Id)_log.txt"
-    $blobOption = "_log"
+    #$blobOption = "_log" uncomment if you want to use AzCopy to upload the log file
 }
 
-# Ensure the directory exists
+# Ensure the directory exists   
 $logDir = Split-Path -Path $logPath -Parent
 if (-not (Test-Path -Path $logDir)) {
     New-Item -Path $logDir -ItemType Directory -Force | Out-Null
 }
 
-Start-Transcript -Path $logPath -Append -Force
-$logFile = $logPath
+Start-Transcript -Path $logPath -Force
+# $logFile = $logPath uncomment if you want to use AzCopy to upload the log file
 
-Import-Module Microsoft.WinGet.Client -ErrorAction Stop
-Write-Verbose ("{0} - Imported Microsoft.WinGet.Client module" -f (Get-Date -Format "dd-MM-yy HH:mm"))
+# Locate winget.exe path
+$wingetPath = Get-ChildItem -Path "$Env:ProgramFiles\WindowsApps" -Directory |
+Where-Object { $_.Name -like "Microsoft.DesktopAppInstaller_*" } |
+ForEach-Object { Join-Path $_.FullName "winget.exe" } |
+Where-Object { Test-Path $_ } |
+Select-Object -First 1
 
 $operationError = $null
-
 Write-Log ("[DEBUG] Script started with parameters: Id=$Id, Version=$Version, Install=$Install, Uninstall=$Uninstall")
 if ($Install) {
     Write-Log ("[DEBUG] Install mode selected")
     try {
         if ($Version -eq 'Latest') {
             Write-Verbose ("{0} - Installing latest version of {1}" -f (Get-Date -Format "dd-MM-yy HH:mm"), $Id)
-            Install-WinGetPackage -Id $Id -Force -MatchOption EqualsCaseInsensitive -ErrorAction Stop
+            Start-Process $wingetPath -ArgumentList "install --id $Id --exact --source winget --accept-source-agreements --disable-interactivity --scope machine --silent --accept-package-agreements --force" -NoNewWindow -Wait
+            Write-Verbose ("{0} - Successfully installed {1} version {2}" -f (Get-Date -Format "dd-MM-yy HH:mm"), $Id, $Version)
         } else {
             Write-Verbose ("{0} - Installing version {1} of {2}" -f (Get-Date -Format "dd-MM-yy HH:mm"), $Version, $Id)
-            Install-WinGetPackage -Id $Id -Version $Version -Force -Mode Silent -MatchOption EqualsCaseInsensitive -Scope SystemOrUnknown -Source WinGet -ErrorAction Stop
+            Start-Process $wingetPath -ArgumentList "install --id $Id --exact --source winget --accept-source-agreements --disable-interactivity --scope machine --silent --accept-package-agreements --force" -NoNewWindow -Wait
+            Write-Verbose ("{0} - Successfully installed {1} version {2}" -f (Get-Date -Format "dd-MM-yy HH:mm"), $Id, $Version)
         }
-
-        # Retry loop to verify package presence after install (5 attempts, 3 sec delay)
-        $maxRetries = 5
-        $success = $false
-        for ($i = 0; $i -lt $maxRetries; $i++) {
-            Start-Sleep -Seconds 3
-            Write-Verbose ("{0} - Verifying installation attempt {1} for package {2}" -f (Get-Date -Format "dd-MM-yy HH:mm"), ($i+1), $Id)
-
-            try {
-                $pkg = Get-WinGetPackage -Id $Id -MatchOption EqualsCaseInsensitive -ErrorAction Stop
-                if ($pkg) {
-                    $success = $true
-                }
-            } catch {
-                # Continue retrying if not found yet
-            }
-        }
-
-        if (-not $success) {
-            Write-Verbose ("{0} - Package {1} not found after install retries" -f (Get-Date -Format "dd-MM-yy HH:mm"), $Id)
-            # throw "Installation failed or package verification unsuccessful."
-            Write-Log "[DEBUG] Installation failed or package verification unsuccessful."
-            $operationError = "Installation failed or package verification unsuccessful."
-        }
-
-        Write-Verbose ("{0} - Successfully installed {1} version {2}" -f (Get-Date -Format "dd-MM-yy HH:mm"), $Id, $Version)
     } catch {
         $operationError = $_
         Write-Log ("[DEBUG] Exception occurred during install: $($_.Exception.Message)")
@@ -152,7 +122,7 @@ if ($Uninstall) {
     Write-Log ("[DEBUG] Uninstall mode selected")
     try {
         Write-Verbose ("{0} - Attempting to uninstall {1}" -f (Get-Date -Format "dd-MM-yy HH:mm"), $Id)
-        Uninstall-WinGetPackage -Id $Id -Force -Mode Silent -ErrorAction Stop
+        Start-Process $wingetPath -ArgumentList "uninstall --id $Id --exact --source winget --accept-source-agreements --disable-interactivity --scope machine --silent" -Wait
         Write-Verbose ("{0} - Successfully uninstalled {1}" -f (Get-Date -Format "dd-MM-yy HH:mm"), $Id)
     } catch {
         $operationError = $_
@@ -182,41 +152,40 @@ if (Test-Path .\Custom.ps1) {
 Stop-Transcript
 Start-Sleep -Seconds 5
 
-<# If you would like to use azure blob storage for your logs, then this section needs to be uncommented
-
-# Verify the log file exists before attempting upload if they select to not use azure blob storage for their logs, then this will not be used and needs to be removed
+<# uncomment if you want to use AzCopy to upload the log file
+#Verify the log file exists before attempting upload
 if (-not (Test-Path -Path $logFile)) {
-    Write-host "ERROR: Log file $logFile does not exist. Upload will be skipped."
+    Write-Log "ERROR: Log file $logFile does not exist. Upload will be skipped."
     exit 1
 }
 
 # Upload log via AzCopy
-Write-host "----- Starting AzCopy log upload -----"
+Write-Log "----- Starting AzCopy log upload -----"
 
 # Construct the target URL
 $blobTarget = "$blobBaseUrl/$deviceName/$Id$blobOption.txt?$sasToken"
-Write-host "Target URL: $blobTarget"
-Write-host "AzCopy Exe Path: $azCopyExe"
+Write-Log "Target URL: $blobTarget"
+Write-Log "AzCopy Exe Path: $azCopyExe"
 
 # Download AzCopy if not available at the expected path
 if (-not (Test-Path -Path $azCopyExe)) {
-    Write-host "AzCopy not found at expected path. Downloading..."
+    Write-Log "AzCopy not found at expected path. Downloading..."
     try {
         $azCopyZip = "$env:TEMP\azcopy.zip"
         Invoke-WebRequest -Uri $azCopyUrl -OutFile $azCopyZip -UseBasicParsing
         Expand-Archive -Path $azCopyZip -DestinationPath $azCopyExtractPath -Force
-        Write-host "AzCopy downloaded and extracted."
+        Write-Log "AzCopy downloaded and extracted."
 
         # Find azcopy.exe dynamically in the extraction path
         $foundAzCopy = Get-ChildItem -Path $azCopyExtractPath -Recurse -Filter "azcopy.exe" | Select-Object -First 1
         if ($foundAzCopy) {
             $azCopyExe = $foundAzCopy.FullName
-            Write-host "AzCopy.exe found at: $azCopyExe"
+            Write-Log "AzCopy.exe found at: $azCopyExe"
         } else {
-            Write-host "AzCopy.exe not found after extraction."
+            Write-Log "AzCopy.exe not found after extraction."
         }
     } catch {
-        Write-host "AzCopy download or extraction failed: $_"
+        Write-Log "AzCopy download or extraction failed: $_"
     }
 }
 
@@ -224,28 +193,27 @@ if (-not (Test-Path -Path $azCopyExe)) {
 if (Test-Path -Path $azCopyExe) {
     $azCommand = "`"$azCopyExe`" copy `"$logFile`" `"$blobTarget`" --overwrite=true --log-level=INFO"
     # For even more details during troubleshooting, you could use: --log-level=DEBUG
-    Write-host "Executing AzCopy upload command: $azCommand"
+    Write-Log "Executing AzCopy upload command: $azCommand"
 
     try {
         $upload = Start-Process -FilePath $azCopyExe -ArgumentList @("copy", "$logFile", "$blobTarget", "--overwrite=true", "--log-level=INFO") -NoNewWindow -Wait -PassThru
         if ($upload.ExitCode -eq 0) {
-            Write-host "AzCopy log upload successful."
+            Write-Log "AzCopy log upload successful."
         } else {
-            Write-host "AzCopy failed with exit code $($upload.ExitCode)."
+            Write-Log "AzCopy failed with exit code $($upload.ExitCode)."
         }
     } catch {
-        Write-host "AzCopy execution failed: $_"
+        Write-Log "AzCopy execution failed: $_"
     }
 } else {
-    Write-host "AzCopy not available. Log upload skipped. Final AzCopy path checked: $azCopyExe"
-} # end of section to be removed if they select to not use azure blob storage for their logs
+    Write-Log "AzCopy not available. Log upload skipped. Final AzCopy path checked: $azCopyExe"
+}
 
 # Exit with appropriate code
 if ($operationError) {
-    Write-Host "not successful"
+    Write-Log "not successful"
     exit 1
 } else {
-    Write-Host "successful"
+    Write-Log "successful"
     exit 0
-}
-    #>
+} #>
