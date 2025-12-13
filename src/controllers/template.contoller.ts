@@ -9,6 +9,7 @@ interface TemplateRequestBody {
   id: string;
   organization: string;
   version?: string;
+  customCommands?: string;
 }
 
 export class TemplateController {
@@ -16,7 +17,8 @@ export class TemplateController {
 
   async downloadEditedTemplate(req: Request, res: Response) {
     try {
-      const { id, organization, version } = req.body as TemplateRequestBody;
+      const { id, organization, version, customCommands } =
+        req.body as TemplateRequestBody;
 
       if (!id || !organization) {
         return res
@@ -32,15 +34,29 @@ export class TemplateController {
         return res.status(400).json({ error: "Invalid version" });
       }
 
+      if (customCommands && typeof customCommands !== "string") {
+        return res.status(400).json({ error: "Invalid custom commands" });
+      }
+
       const tempDir = await this.templateService.copyTemplateToTemp();
 
-      const replacements = {
-        "<Replace me:Id>": `${id}`,
-        "<Replace me:Organization>": `${organization}`,
-        "<Replace me:Version>": version ? version : "Latest",
-      };
-
-      await this.templateService.editTemplateFiles(tempDir, replacements);
+      if (customCommands) {
+        const replacements = {
+          "<Replace me:Id>": `${id}`,
+          "<Replace me:Organization>": `${organization}`,
+          "<Replace me:Version>": version ? version : "Latest",
+          "<Replace me:CustomFileInstall>": customCommands,
+          "<Replace me:CustomFileUninstall>": customCommands,
+        };
+        await this.templateService.editTemplateFiles(tempDir, replacements);
+      } else {
+        const replacements = {
+          "<Replace me:Id>": `${id}`,
+          "<Replace me:Organization>": `${organization}`,
+          "<Replace me:Version>": version ? version : "Latest",
+        };
+        await this.templateService.editTemplateFiles(tempDir, replacements);
+      }
 
       const zipPath = path.join(
         __dirname,
