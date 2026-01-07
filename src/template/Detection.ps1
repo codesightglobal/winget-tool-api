@@ -1,4 +1,4 @@
-<# ------------------------------------------------------------------------------
+﻿<# ------------------------------------------------------------------------------
 # .SYNOPSIS
     Detection script for WinGet packages to be used with Microsoft Intune
 
@@ -19,8 +19,8 @@
 #See https://github.com/microsoft/winget-cli/issues/4820
 #Supply the ID and version of the WinGet package here, use Latest if version is not important
 #For example $Id = 'notepad++.notepad++' / $Version = '8.7.8' or $Id = '7zip.7zip' / $Version = 'Latest'
-$Id = '<Replace me: Id>'
-$Version = '<Replace me: Version>'
+$Id = '<Replace me:Id>'
+$Version = '<Replace me:Version>'
 
  # Function to fetch intune enrolled tenant name
 function Get-IntuneTenantName {
